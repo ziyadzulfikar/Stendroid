@@ -42,4 +42,12 @@ model Message {
   receiverId String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model EarlyBirdSignup {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 } 

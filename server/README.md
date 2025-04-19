@@ -185,6 +185,76 @@ curl -X GET http://localhost:5001/api/messages/actual-user-id
 curl -X GET http://localhost:5001/api/posts
 ```
 
+### Early Bird Signup
+
+#### Submit Email for Early Access
+- **URL**: `/api/early-bird/signup`
+- **Method**: `POST`
+- **Request Body**:
+```json
+{
+  "email": "user@example.com"
+}
+```
+- **Response** (Success):
+```json
+{
+  "message": "Thank you for your interest! We will notify you when early access is available.",
+  "success": true
+}
+```
+- **Response** (Already Registered):
+```json
+{
+  "message": "Email already registered for early access",
+  "alreadyRegistered": true
+}
+```
+- **CURL Example**:
+```bash
+curl -X POST http://localhost:5001/api/early-bird/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com"
+  }'
+```
+
+#### Get All Early Bird Signups (Admin only)
+- **URL**: `/api/early-bird`
+- **Method**: `GET`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Response**: Array of early bird signup objects
+- **CURL Example**:
+```bash
+curl -X GET http://localhost:5001/api/early-bird \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+#### Approve Early Bird Access (Admin only)
+- **URL**: `/api/early-bird/:id/approve`
+- **Method**: `PUT`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Response**:
+```json
+{
+  "message": "Early bird access approved",
+  "signup": {
+    "id": "signup-id",
+    "email": "user@example.com",
+    "approved": true,
+    "createdAt": "2023-04-17T14:30:00Z",
+    "updatedAt": "2023-04-17T15:00:00Z"
+  }
+}
+```
+- **CURL Example**:
+```bash
+curl -X PUT http://localhost:5001/api/early-bird/signup-id/approve \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
 ## Common Issues and Troubleshooting
 
 ### Invalid Token Error

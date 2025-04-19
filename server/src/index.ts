@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import routes from './routes';
+import earlyBirdRoutes from './routes/earlyBird';
 import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
 
@@ -46,6 +47,7 @@ app.use(express.json());
 // Routes
 app.use('/api', routes);
 app.use('/api/auth', authRoutes);
+app.use('/api/early-bird', earlyBirdRoutes);
 
 // Health check route
 app.get('/', (_req, res) => {
