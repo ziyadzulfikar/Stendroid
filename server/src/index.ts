@@ -3,11 +3,41 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import routes from './routes';
+import { PrismaClient } from '@prisma/client';
+import { exec } from 'child_process';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5001;
+const prisma = new PrismaClient();
+
+// Run database setup
+const setupDatabase = async () => {
+  try {
+    console.log('Setting up database...');
+    
+    // Check database connection
+    await prisma.$connect();
+    console.log('Database connection successful');
+    
+    // Create tables if they don't exist (development only approach)
+    console.log('Pushing schema to database...');
+    exec('npx prisma db push --accept-data-loss', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Schema push error: ${error.message}`);
+        return;
+      }
+      if (stderr) {
+        console.error(`Schema push stderr: ${stderr}`);
+        return;
+      }
+      console.log(`Schema push output: ${stdout}`);
+    });
+  } catch (error) {
+    console.error('Database setup error:', error);
+  }
+};
 
 // Middleware
 app.use(cors());
@@ -32,6 +62,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+// Initialize app
+setupDatabase().then(() => {
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
 }); 
