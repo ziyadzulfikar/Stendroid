@@ -3,7 +3,7 @@ services:
     name: linkedin-clone-api
     env: node
     plan: free
-    buildCommand: cd server && npm install && npx prisma generate && npm run build
+    buildCommand: cd server && npm install && npx prisma generate && npx prisma migrate deploy && npm run build
     startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
