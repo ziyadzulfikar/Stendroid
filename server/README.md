@@ -193,7 +193,8 @@ curl -X GET http://localhost:5001/api/posts
 - **Request Body**:
 ```json
 {
-  "email": "user@example.com"
+  "email": "user@example.com",
+  "userType": "startup" // Optional, can be "startup" or "enterprise", defaults to "startup"
 }
 ```
 - **Response** (Success):
@@ -215,7 +216,8 @@ curl -X GET http://localhost:5001/api/posts
 curl -X POST http://localhost:5001/api/early-bird/signup \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "user@example.com"
+    "email": "user@example.com",
+    "userType": "enterprise"
   }'
 ```
 
@@ -255,6 +257,183 @@ curl -X PUT http://localhost:5001/api/early-bird/signup-id/approve \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
+### Admin Dashboard
+
+These endpoints are protected and require authentication. In a production environment, you should also implement role-based access control to restrict these endpoints to admin users only.
+
+#### Get Dashboard Statistics
+- **URL**: `/api/admin/dashboard`
+- **Method**: `GET`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Response**:
+```json
+{
+  "stats": {
+    "users": 42,
+    "posts": 128,
+    "messages": 256,
+    "earlyBirdSignups": 30,
+    "pendingEarlyBirdSignups": 15
+  },
+  "lastUpdated": "2023-04-17T15:30:00Z"
+}
+```
+
+#### Get All Users
+- **URL**: `/api/admin/users`
+- **Method**: `GET`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Query Parameters**:
+  - `page`: Page number (default: 1)
+  - `limit`: Items per page (default: 10)
+- **Response**:
+```json
+{
+  "users": [
+    {
+      "id": "user-id",
+      "name": "User Name",
+      "email": "user@example.com",
+      "createdAt": "2023-04-15T10:30:00Z",
+      "_count": {
+        "posts": 5,
+        "sentMessages": 10,
+        "receivedMessages": 8
+      }
+    },
+    // More users...
+  ],
+  "pagination": {
+    "total": 42,
+    "page": 1,
+    "limit": 10,
+    "pages": 5
+  }
+}
+```
+
+#### Ban a User
+- **URL**: `/api/admin/users/:id/ban`
+- **Method**: `PUT`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Request Body**:
+```json
+{
+  "reason": "Violated terms of service by posting inappropriate content"
+}
+```
+- **Response**:
+```json
+{
+  "message": "User banned successfully",
+  "user": {
+    "id": "user-id",
+    "email": "user@example.com",
+    "name": "User Name",
+    "banned": true,
+    "banReason": "Violated terms of service by posting inappropriate content"
+  }
+}
+```
+
+#### Get All Posts
+- **URL**: `/api/admin/posts`
+- **Method**: `GET`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Query Parameters**:
+  - `page`: Page number (default: 1)
+  - `limit`: Items per page (default: 10)
+- **Response**:
+```json
+{
+  "posts": [
+    {
+      "id": "post-id",
+      "content": "Post content",
+      "createdAt": "2023-04-16T11:20:00Z",
+      "author": {
+        "id": "user-id",
+        "name": "User Name",
+        "email": "user@example.com"
+      }
+    },
+    // More posts...
+  ],
+  "pagination": {
+    "total": 128,
+    "page": 1,
+    "limit": 10,
+    "pages": 13
+  }
+}
+```
+
+#### Delete a Post
+- **URL**: `/api/admin/posts/:id`
+- **Method**: `DELETE`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Response**:
+```json
+{
+  "message": "Post deleted successfully"
+}
+```
+
+#### Get Early Bird Signups
+- **URL**: `/api/admin/early-bird`
+- **Method**: `GET`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Query Parameters**:
+  - `page`: Page number (default: 1)
+  - `limit`: Items per page (default: 10)
+  - `approved`: Filter by approval status (`true` or `false`)
+- **Response**:
+```json
+{
+  "signups": [
+    {
+      "id": "signup-id",
+      "email": "user@example.com",
+      "approved": false,
+      "createdAt": "2023-04-17T09:15:00Z",
+      "updatedAt": "2023-04-17T09:15:00Z"
+    },
+    // More signups...
+  ],
+  "pagination": {
+    "total": 30,
+    "page": 1,
+    "limit": 10,
+    "pages": 3
+  }
+}
+```
+
+#### Bulk Approve Early Bird Signups
+- **URL**: `/api/admin/early-bird/approve`
+- **Method**: `POST`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Request Body**:
+```json
+{
+  "ids": ["signup-id-1", "signup-id-2", "signup-id-3"]
+}
+```
+- **Response**:
+```json
+{
+  "message": "3 signups approved successfully",
+  "updated": 3
+}
+```
+
 ## Common Issues and Troubleshooting
 
 ### Invalid Token Error
@@ -274,7 +453,12 @@ If you're having trouble connecting to the database, check:
 
 ## Database Schema
 
-The application uses the following database models:
+### Models
+
+- User - User accounts information
+- Post - User posts/updates
+- Message - Direct messages between users
+- EarlyBirdSignup - Early access registrations with organization type
 
 ### User
 - id: String (Primary Key)
@@ -283,6 +467,16 @@ The application uses the following database models:
 - name: String
 - createdAt: DateTime
 - updatedAt: DateTime
+
+### EarlyBirdSignup
+- id: String (Primary Key)
+- email: String (Unique)
+- userType: String ("startup" or "enterprise", defaults to "startup")
+- approved: Boolean
+- createdAt: DateTime
+- updatedAt: DateTime
+
+The `userType` field distinguishes between different types of organizations signing up for early access. In the admin dashboard, this information is displayed with color-coded badges (blue for Enterprise, green for Startup) in a dedicated "User Type" column.
 
 ### Post
 - id: String (Primary Key)

@@ -17,6 +17,10 @@ model User {
   location  String?
   website   String?
   avatar    String?
+  userType  String   @default("startup") // Can be "startup" or "enterprise"
+  isAdmin   Boolean  @default(false)
+  banned    Boolean  @default(false)
+  banReason String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   posts     Post[]
@@ -40,6 +44,7 @@ model Message {
   senderId  String
   receiver  User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
   receiverId String
+  read      Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -47,6 +52,7 @@ model Message {
 model EarlyBirdSignup {
   id        String   @id @default(cuid())
   email     String   @unique
+  userType  String   @default("startup") // Can be "enterprise" or "startup"
   approved  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

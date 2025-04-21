@@ -1,15 +1,19 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import http from 'http';
 import authRoutes from './routes/auth';
 import routes from './routes';
 import earlyBirdRoutes from './routes/earlyBird';
+import adminRoutes from './routes/admin';
 import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
+import { setupSocketServer } from './config/socketServer';
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 const port = process.env.PORT || 5001;
 const prisma = new PrismaClient();
 
@@ -48,6 +52,7 @@ app.use(express.json());
 app.use('/api', routes);
 app.use('/api/auth', authRoutes);
 app.use('/api/early-bird', earlyBirdRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check route
 app.get('/', (_req, res) => {
@@ -66,7 +71,12 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 // Initialize app
 setupDatabase().then(() => {
-  app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+  // Initialize Socket.IO
+  setupSocketServer(server);
+  
+  // Start the server
+  server.listen(port, () => {
+    console.log(`HTTP Server is running on http://localhost:${port}`);
+    console.log(`WebSocket Server is running on ws://localhost:${port}`);
   });
 }); 

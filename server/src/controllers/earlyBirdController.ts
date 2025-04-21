@@ -3,7 +3,7 @@ import prisma from '../config/database';
 
 export const signupForEarlyAccess = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email } = req.body;
+    const { email, userType = 'startup' } = req.body;
 
     // Validate email
     if (!email || !email.includes('@')) {
@@ -28,6 +28,7 @@ export const signupForEarlyAccess = async (req: Request, res: Response): Promise
     await prisma.earlyBirdSignup.create({
       data: {
         email,
+        userType: userType === 'enterprise' ? 'enterprise' : 'startup',
       },
     });
 

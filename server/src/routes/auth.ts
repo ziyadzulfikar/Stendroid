@@ -1,10 +1,6 @@
 import express from 'express';
-import { register, login, getProfile } from '../controllers/authController';
+import { register, login, getProfile, verifyToken, checkBanStatus } from '../controllers/authController';
 import { authenticateToken } from '../middleware/auth';
-// We'll add password hashing later (e.g., using bcrypt)
-// import bcrypt from 'bcrypt'; 
-// We'll add JWT later
-// import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
@@ -16,5 +12,11 @@ router.post('/login', login);
 
 // GET /api/auth/profile
 router.get('/profile', authenticateToken, getProfile);
+
+// GET /api/auth/verify - verify token and check if user is banned
+router.get('/verify', authenticateToken, verifyToken);
+
+// GET /api/auth/check-ban/:userId - Check if a specific user is banned
+router.get('/check-ban/:userId', authenticateToken, checkBanStatus);
 
 export default router; 

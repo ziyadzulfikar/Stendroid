@@ -1,11 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
 
-export const authenticateToken = (
+const prisma = new PrismaClient();
+
+export const authenticateToken = async (
   req: Request,
   res: Response,
   next: NextFunction
-): void => {
+): Promise<void> => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -16,6 +19,26 @@ export const authenticateToken = (
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as { userId: string };
+    
+    // Check if user is banned
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { banned: true, banReason: true }
+    });
+    
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+    
+    if (user.banned) {
+      res.status(403).json({ 
+        message: 'Access denied. Your account has been banned.', 
+        reason: user.banReason || 'No reason specified'
+      });
+      return;
+    }
+    
     res.locals.userId = decoded.userId;
     next();
   } catch (error) {
