@@ -43,8 +43,9 @@ coverage/
 # Database files
 *.sqlite
 
-# Ignore client folder
-client/
+# Next.js build directory
+client/.next/
+client/out/
 
 # Ignore README.md
 /README.md
