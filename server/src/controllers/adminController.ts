@@ -182,6 +182,35 @@ export const unbanUser = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// Toggle admin status of a user
+export const toggleUserAdmin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { isAdmin } = req.body;
+    
+    if (typeof isAdmin !== 'boolean') {
+      res.status(400).json({ message: 'Invalid request. isAdmin must be a boolean value.' });
+      return;
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { isAdmin }
+    });
+
+    // Remove password from response
+    const { password, ...userWithoutPassword } = user;
+
+    res.json({ 
+      message: isAdmin ? 'User promoted to admin successfully' : 'Admin privileges removed successfully',
+      user: userWithoutPassword
+    });
+  } catch (error) {
+    console.error('Toggle admin status error:', error);
+    res.status(500).json({ message: 'Error updating user admin status' });
+  }
+};
+
 // Get all early bird signups with pagination
 export const getEarlyBirdSignups = async (req: Request, res: Response): Promise<void> => {
   try {

@@ -1,0 +1,32 @@
+/* Custom styles for the admin panel */
+.admin-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pagination-active {
+  background-color: #3B82F6;
+  color: white;
+}
+
+.pagination-item {
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  margin: 0 0.25rem;
+}
+
+.loader {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3B82F6;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+} 

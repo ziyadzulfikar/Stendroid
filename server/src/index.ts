@@ -2,10 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
+import path from 'path';
 import authRoutes from './routes/auth';
 import routes from './routes';
 import earlyBirdRoutes from './routes/earlyBird';
-import adminRoutes from './routes/admin';
+import adminAPIRoutes from './routes/admin';
 import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
 import { setupSocketServer } from './config/socketServer';
@@ -47,26 +48,34 @@ const setupDatabase = async () => {
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Routes
+// API Routes
 app.use('/api', routes);
 app.use('/api/auth', authRoutes);
 app.use('/api/early-bird', earlyBirdRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminAPIRoutes);
 
 // Health check route
-app.get('/', (_req, res) => {
-  res.json({ message: 'Welcome to the API' });
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+// Client app fallback (redirect to client app for all other routes)
+app.get('*', (_req, res) => {
+  res.redirect(process.env.FRONTEND_URL || 'http://localhost:3000');
 });
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  
+  // API error response
+  res.status(500).json({ 
+    status: 500,
+    message: 'Something went wrong!'
+  });
 });
 
 // Initialize app
@@ -78,5 +87,6 @@ setupDatabase().then(() => {
   server.listen(port, () => {
     console.log(`HTTP Server is running on http://localhost:${port}`);
     console.log(`WebSocket Server is running on ws://localhost:${port}`);
+    console.log(`API Server ready to serve client-side application`);
   });
 }); 

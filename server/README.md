@@ -434,6 +434,81 @@ These endpoints are protected and require authentication. In a production enviro
 }
 ```
 
+### Admin API
+
+#### Create Admin User (Temporary endpoint)
+- **URL**: `/api/admin/create-admin`
+- **Method**: `POST`
+- **Security**: Uses a secret key instead of user authentication
+- **Request Body**:
+```json
+{
+  "name": "Admin Name",
+  "email": "admin@example.com",
+  "password": "strong-password",
+  "secretKey": "the-admin-secret-key-from-env"
+}
+```
+- **Response**:
+```json
+{
+  "message": "Admin user created successfully",
+  "user": {
+    "id": "user-id",
+    "email": "admin@example.com",
+    "name": "Admin Name",
+    "isAdmin": true,
+    "createdAt": "2023-04-17T14:30:00Z",
+    "updatedAt": "2023-04-17T14:30:00Z"
+  }
+}
+```
+- **CURL Example**:
+```bash
+curl -X POST https://your-api-url/api/admin/create-admin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Admin User",
+    "email": "admin@example.com",
+    "password": "strong-admin-password",
+    "secretKey": "your-admin-secret-key"
+  }'
+```
+
+#### Toggle User Admin Status (Admin only)
+- **URL**: `/api/admin/users/:id/toggle-admin`
+- **Method**: `PUT`
+- **Headers**: 
+  - `Authorization: Bearer jwt-token`
+- **Request Body**:
+```json
+{
+  "isAdmin": true
+}
+```
+- **Response**:
+```json
+{
+  "message": "User promoted to admin successfully",
+  "user": {
+    "id": "user-id",
+    "email": "user@example.com",
+    "name": "User Name",
+    "isAdmin": true,
+    // Other user fields...
+  }
+}
+```
+- **CURL Example**:
+```bash
+curl -X PUT https://your-api-url/api/admin/users/user-id-here/toggle-admin \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "isAdmin": true
+  }'
+```
+
 ## Common Issues and Troubleshooting
 
 ### Invalid Token Error

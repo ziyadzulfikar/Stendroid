@@ -1,52 +1,63 @@
+// Script to create an admin user during deployment
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+
 const prisma = new PrismaClient();
 
-async function createAdmin(name, email, password) {
+async function createAdminUser() {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminEmail || !adminPassword) {
+    console.error('Error: ADMIN_EMAIL and ADMIN_PASSWORD environment variables must be set');
+    process.exit(1);
+  }
+
   try {
-    // Check if a user with this email already exists
+    // Check if the admin user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: adminEmail },
     });
 
     if (existingUser) {
-      console.error(`User with email ${email} already exists.`);
+      // Update the existing user to ensure they're an admin
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { isAdmin: true },
+      });
+      
+      console.log(`Updated existing user ${adminEmail} to admin status`);
       return;
     }
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     // Create a new admin user
-    const newUser = await prisma.user.create({
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    
+    const adminUser = await prisma.user.create({
       data: {
-        name,
-        email,
+        email: adminEmail,
         password: hashedPassword,
-        isAdmin: true
-      }
+        name: 'Admin User',
+        isAdmin: true,
+      },
     });
 
-    console.log(`Admin user created successfully:`);
-    console.log(`Name: ${newUser.name}`);
-    console.log(`Email: ${newUser.email}`);
-    console.log(`ID: ${newUser.id}`);
+    console.log(`Created admin user: ${adminUser.email}`);
   } catch (error) {
     console.error('Error creating admin user:', error);
+    process.exit(1);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-// Check if all required arguments were provided
-const name = process.argv[2];
-const email = process.argv[3];
-const password = process.argv[4];
-
-if (!name || !email || !password) {
-  console.error('Please provide all required fields: node createAdmin.js "Admin Name" admin@example.com password123');
-  process.exit(1);
-}
-
-// Create the admin user
-createAdmin(name, email, password); 
+createAdminUser()
+  .then(() => {
+    console.log('Admin user creation process completed');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Unhandled error in admin user creation:', error);
+    process.exit(1);
+  }); 
