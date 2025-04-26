@@ -11,6 +11,8 @@ import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
 import initSocketServer from './config/socketServer';
 import requestLogger from './middlewares/requestLogger';
+import { cleanupOldLogs } from './utils/cleanLogs';
+import logger from './config/logger';
 
 dotenv.config();
 
@@ -45,6 +47,9 @@ const setupDatabase = async () => {
     console.error('Database setup error:', error);
   }
 };
+
+// Clean up old log files
+cleanupOldLogs();
 
 // Middleware
 app.use(cors());
@@ -87,8 +92,8 @@ setupDatabase().then(() => {
   
   // Start the server
   server.listen(port, () => {
-    console.log(`HTTP Server is running on http://localhost:${port}`);
-    console.log(`WebSocket Server is running on ws://localhost:${port}`);
-    console.log(`API Server ready to serve client-side application`);
+    logger.info(`HTTP Server is running on http://localhost:${port}`);
+    logger.info(`WebSocket Server is running on ws://localhost:${port}`);
+    logger.info(`API Server ready to serve client-side application`);
   });
 }); 

@@ -1,4 +1,5 @@
 import winston from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
 
 // Define log levels
 const levels = {
@@ -37,14 +38,42 @@ const format = winston.format.combine(
   ),
 );
 
+// Configure rotational file transport for all logs
+const allLogsRotateTransport = new DailyRotateFile({
+  filename: 'logs/all-%DATE%.log',
+  datePattern: 'YYYY-MM-DD',
+  maxSize: '150k',       // Rotate when file reaches 150KB
+  maxFiles: 5,           // Keep a maximum of 5 files
+  zippedArchive: true,   // Compress rotated files
+  format: winston.format.combine(
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
+    winston.format.printf(
+      (info: winston.Logform.TransformableInfo) => `${info.timestamp} ${info.level}: ${info.message}`,
+    ),
+  ),
+});
+
+// Configure rotational file transport for error logs
+const errorLogsRotateTransport = new DailyRotateFile({
+  filename: 'logs/error-%DATE%.log',
+  datePattern: 'YYYY-MM-DD',
+  level: 'error',
+  maxSize: '150k',       // Rotate when file reaches 150KB
+  maxFiles: 5,           // Keep a maximum of 5 files
+  zippedArchive: true,   // Compress rotated files
+  format: winston.format.combine(
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
+    winston.format.printf(
+      (info: winston.Logform.TransformableInfo) => `${info.timestamp} ${info.level}: ${info.message}`,
+    ),
+  ),
+});
+
 // Define transports for logs
 const transports = [
   new winston.transports.Console(),
-  new winston.transports.File({
-    filename: 'logs/error.log',
-    level: 'error',
-  }),
-  new winston.transports.File({ filename: 'logs/all.log' }),
+  errorLogsRotateTransport,
+  allLogsRotateTransport
 ];
 
 // Create the logger

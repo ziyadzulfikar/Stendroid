@@ -46,6 +46,7 @@ Comprehensive API documentation is available in the `src/docs` directory:
 - [REST API Documentation](src/docs/api.md) - Complete reference for REST endpoints
 - [Socket.IO API Documentation](src/docs/socketAPI.md) - WebSocket real-time functionality
 - [Authentication Documentation](src/docs/auth.md) - Authentication system details
+- [Logging Documentation](src/docs/logging.md) - Logging system and log rotation details
 
 ## Server Architecture
 
