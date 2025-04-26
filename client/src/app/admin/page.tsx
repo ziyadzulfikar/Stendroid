@@ -61,10 +61,10 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8 text-gray-900">Dashboard Overview</h1>
+      <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8 text-gray-900">Dashboard Overview</h1>
       
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <StatCard 
             title="Total Users" 
             value={stats.users} 
@@ -99,9 +99,9 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <div className="mt-10">
-        <h2 className="text-2xl font-bold mb-4 text-gray-900">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mt-8 md:mt-10">
+        <h2 className="text-xl md:text-2xl font-bold mb-4 text-gray-900">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <ActionButton 
             title="Manage Users" 
             href="/admin/users" 
@@ -138,13 +138,13 @@ function StatCard({
   highlight?: boolean;
 }) {
   return (
-    <div className={`${color} rounded-lg shadow p-6 ${highlight ? 'ring-2 ring-red-500' : ''}`}>
+    <div className={`${color} rounded-lg shadow p-4 md:p-6 ${highlight ? 'ring-2 ring-red-500' : ''}`}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-gray-900 text-sm font-semibold">{title}</p>
-          <p className="text-3xl font-bold mt-1 text-gray-900">{value}</p>
+          <p className="text-2xl md:text-3xl font-bold mt-1 text-gray-900">{value}</p>
         </div>
-        <div className="text-4xl">{icon}</div>
+        <div className="text-3xl md:text-4xl">{icon}</div>
       </div>
     </div>
   );

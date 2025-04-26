@@ -9,7 +9,8 @@ import earlyBirdRoutes from './routes/earlyBird';
 import adminAPIRoutes from './routes/admin';
 import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
-import { setupSocketServer } from './config/socketServer';
+import initSocketServer from './config/socketServer';
+import requestLogger from './middlewares/requestLogger';
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ const setupDatabase = async () => {
 
 // Middleware
 app.use(cors());
+app.use(requestLogger);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -81,7 +83,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // Initialize app
 setupDatabase().then(() => {
   // Initialize Socket.IO
-  setupSocketServer(server);
+  initSocketServer(server);
   
   // Start the server
   server.listen(port, () => {

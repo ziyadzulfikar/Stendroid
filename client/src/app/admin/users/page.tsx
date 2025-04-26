@@ -243,106 +243,163 @@ export default function AdminUsersPage() {
     <div className="mb-8">
       <h2 className={`text-xl font-semibold mb-4 ${titleClass}`}>{title} ({userList.length})</h2>
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Content
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                User Type
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Joined Date
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {userList.length > 0 ? userList.map((user) => (
-              <tr key={user.id} className={user.banned ? 'bg-red-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                  {user.name}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                  {user.email}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="text-sm text-gray-800">
-                    Posts: {user._count.posts} | 
-                    Messages: {user._count.sentMessages + user._count.receivedMessages}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${user.userType === 'startup' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                    {user.userType ? user.userType.charAt(0).toUpperCase() + user.userType.slice(1) : 'Startup'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {formatDate(user.createdAt)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center space-x-2">
-                    {user.banned ? (
-                      <div className="flex items-center space-x-2">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                          Banned
-                        </span>
-                        <button
-                          onClick={() => handleUnbanUser(user.id, user.name)}
-                          disabled={isUnbanning}
-                          className="text-green-600 hover:text-green-900 text-sm font-medium"
+        {/* Desktop table view - hidden on small screens */}
+        <div className="hidden md:block">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                  Email
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                  Joined
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                  Activity
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-900 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {userList.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    No users in this category
+                  </td>
+                </tr>
+              ) : (
+                userList.map(user => (
+                  <tr key={user.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{user.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{formatDate(user.createdAt)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        user.userType === 'enterprise' 
+                        ? 'bg-purple-100 text-purple-800' 
+                        : 'bg-green-100 text-green-800'
+                      }`}>
+                        {user.userType || 'startup'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div>Posts: {user._count?.posts || 0}</div>
+                      <div>Messages: {(user._count?.sentMessages || 0) + (user._count?.receivedMessages || 0)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        {!user.banned && (
+                          <button 
+                            onClick={() => handleBanClick(user)} 
+                            className="text-red-600 hover:text-red-900"
+                            disabled={user.id === currentUserId}
+                          >
+                            Ban
+                          </button>
+                        )}
+                        {user.banned && (
+                          <button 
+                            onClick={() => handleUnbanUser(user.id, user.name)} 
+                            className="text-green-600 hover:text-green-900"
+                            disabled={isUnbanning}
+                          >
+                            Unban
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleToggleAdmin(user.id, user.isAdmin || false, user.name)} 
+                          className={`${user.isAdmin ? 'text-orange-600 hover:text-orange-900' : 'text-blue-600 hover:text-blue-900'}`}
+                          disabled={isTogglingAdmin || (user.id === currentUserId && user.isAdmin)}
                         >
-                          Unban
+                          {user.isAdmin ? 'Remove Admin' : 'Make Admin'}
                         </button>
                       </div>
-                    ) : user.id === currentUserId ? (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        Current User
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleBanClick(user)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Ban
-                      </button>
-                    )}
-                    
-                    {/* Admin Toggle Button */}
-                    {user.id !== currentUserId && (
-                      <button
-                        onClick={() => handleToggleAdmin(user.id, !!user.isAdmin, user.name)}
-                        disabled={isTogglingAdmin}
-                        className={`ml-3 px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.isAdmin 
-                            ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' 
-                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                        }`}
-                      >
-                        {user.isAdmin ? 'Remove Admin' : 'Make Admin'}
-                      </button>
-                    )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile card view - shown only on small screens */}
+        <div className="md:hidden divide-y divide-gray-200">
+          {userList.length === 0 ? (
+            <div className="p-4 text-center text-gray-500">
+              No users in this category
+            </div>
+          ) : (
+            userList.map(user => (
+              <div key={user.id} className="p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                    <div className="text-sm text-gray-600">{user.email}</div>
                   </div>
-                </td>
-              </tr>
-            )) : (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                  No users found in this category
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    user.userType === 'enterprise' 
+                    ? 'bg-purple-100 text-purple-800' 
+                    : 'bg-green-100 text-green-800'
+                  }`}>
+                    {user.userType || 'startup'}
+                  </span>
+                </div>
+                
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div>Joined: {formatDate(user.createdAt)}</div>
+                  <div>Posts: {user._count?.posts || 0}</div>
+                  <div>Messages: {(user._count?.sentMessages || 0) + (user._count?.receivedMessages || 0)}</div>
+                </div>
+                
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                  {!user.banned && (
+                    <button 
+                      onClick={() => handleBanClick(user)} 
+                      className="px-3 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100"
+                      disabled={user.id === currentUserId}
+                    >
+                      Ban
+                    </button>
+                  )}
+                  {user.banned && (
+                    <button 
+                      onClick={() => handleUnbanUser(user.id, user.name)} 
+                      className="px-3 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100"
+                      disabled={isUnbanning}
+                    >
+                      Unban
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => handleToggleAdmin(user.id, user.isAdmin || false, user.name)} 
+                    className={`px-3 py-1 text-xs rounded ${
+                      user.isAdmin 
+                        ? 'bg-orange-50 text-orange-600 hover:bg-orange-100' 
+                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                    }`}
+                    disabled={isTogglingAdmin || (user.id === currentUserId && user.isAdmin)}
+                  >
+                    {user.isAdmin ? 'Remove Admin' : 'Make Admin'}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

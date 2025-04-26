@@ -1,146 +1,342 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
-import Image from 'next/image';
+import UserSearch from '@/components/UserSearch';
+import { useMessaging } from '@/contexts/MessagingContext';
 
+// Define the API endpoint URL
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+
+// Make User interface match the one in UserSearch component
 interface User {
   id: string;
   name: string;
-  avatar: string;
+  avatar?: string;
+  email?: string;
 }
 
 interface Conversation {
   id: string;
+  userId: string;
   name: string;
   avatar: string;
   lastMessage: string;
   timestamp: string;
+  isOnline?: boolean;
 }
-
-interface Message {
-  id: string;
-  content: string;
-  senderId: string;
-  timestamp: string;
-}
-
-interface Messages {
-  [key: string]: Message[];
-}
-
-// Mock data for conversations
-const mockConversations: Conversation[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-    lastMessage: 'Hey, thanks for connecting! I saw your profile and we have similar interests in React development.',
-    timestamp: '2023-04-15T10:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    lastMessage: 'I read your article on React performance optimization. It was really helpful!',
-    timestamp: '2023-04-14T15:30:00Z',
-  },
-  {
-    id: '3',
-    name: 'Mike Johnson',
-    avatar: 'https://randomuser.me/api/portraits/men/3.jpg',
-    lastMessage: 'Are you available for a quick chat about the project we discussed?',
-    timestamp: '2023-04-13T09:15:00Z',
-  },
-];
-
-// Mock data for messages
-const mockMessages: Record<string, Message[]> = {
-  '1': [
-    {
-      id: '1',
-      content: 'Hey, thanks for connecting! I saw your profile and we have similar interests in React development.',
-      senderId: '1',
-      timestamp: new Date('2024-03-10T10:00:00').toISOString(),
-    },
-    {
-      id: '2',
-      content: 'Hi John! Thanks for reaching out. Yes, I\'m always interested in connecting with other React developers.',
-      senderId: 'current-user',
-      timestamp: '2023-04-15T10:05:00Z',
-    },
-    {
-      id: '3',
-      content: 'Great! Have you worked with Next.js before? I\'m thinking of using it for my next project.',
-      senderId: '1',
-      timestamp: '2023-04-15T10:10:00Z',
-    },
-  ],
-  '2': [
-    {
-      id: '1',
-      content: 'I read your article on React performance optimization. It was really helpful!',
-      senderId: '2',
-      timestamp: '2023-04-14T15:30:00Z',
-    },
-    {
-      id: '2',
-      content: 'Thank you! I\'m glad you found it useful. Are you working on any performance issues in your current project?',
-      senderId: 'current-user',
-      timestamp: '2023-04-14T16:00:00Z',
-    },
-  ],
-  '3': [
-    {
-      id: '1',
-      content: 'Are you available for a quick chat about the project we discussed?',
-      senderId: '3',
-      timestamp: '2023-04-13T09:15:00Z',
-    },
-  ],
-};
 
 export default function MessagesPage() {
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Messages>(mockMessages);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Get messaging context for real-time functionality
+  const { 
+    messages, 
+    sendMessage, 
+    typingUsers, 
+    onlineUsers, 
+    setActiveConversation, 
+    activeConversation, 
+    notifyTyping,
+    loadingMessages,
+    connectionStatus 
+  } = useMessaging();
 
-  // Simulate loading state
+  // Filter messages for current conversation
+  const filteredMessages = useMemo(() => {
+    if (!selectedUserId || !currentUser) return [];
+    
+    return messages.filter(message => 
+      (message.senderId === currentUser.id && message.receiverId === selectedUserId) || 
+      (message.receiverId === currentUser.id && message.senderId === selectedUserId)
+    );
+  }, [messages, selectedUserId, currentUser]);
+
+  // Log message count for debugging
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+    console.log(`Filtered messages: ${filteredMessages.length}, All messages: ${messages.length}`);
+    if (selectedUserId) {
+      console.log(`Showing messages for conversation with user ID: ${selectedUserId}`);
+    }
+  }, [filteredMessages.length, messages.length, selectedUserId]);
 
+  // Fetch conversations on component mount and periodically
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        // Don't show loading state during refresh to prevent UI flicker
+        const isInitialLoad = conversations.length === 0;
+        if (isInitialLoad) {
+          setIsLoading(true);
+        }
+        
+        // Get current user from localStorage
+        const userJson = localStorage.getItem('user');
+        if (userJson) {
+          try {
+            const userData = JSON.parse(userJson);
+            setCurrentUser(userData);
+          } catch (e) {
+            console.error('Error parsing user data:', e);
+          }
+        }
+        
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No authentication token found');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Fetch conversations from API
+        const response = await fetch(`${API_URL}/api/conversations`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch conversations: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data && Array.isArray(data)) {
+          // Transform conversation data to match our interface
+          const formattedConversations = data.map((conv: any) => ({
+            id: conv.id || `conv-${conv.userId}`,
+            userId: conv.userId,
+            name: conv.userName || 'Unknown User',
+            avatar: conv.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(conv.userName || 'User')}`,
+            lastMessage: conv.lastMessage || '',
+            timestamp: conv.timestamp || new Date().toISOString(),
+            isOnline: onlineUsers?.has(conv.userId) || false
+          }));
+          
+          // Preserve selected conversation during refresh
+          setConversations(formattedConversations);
+          
+          // If a conversation was previously selected (e.g. from URL), try to reselect it
+          const urlParams = new URLSearchParams(window.location.search);
+          const userId = urlParams.get('userId');
+          
+          if (userId && !selectedConversation) {
+            const foundConversation = formattedConversations.find(c => c.userId === userId);
+            if (foundConversation) {
+              selectConversation(foundConversation);
+              return;
+            }
+          }
+          
+          // Otherwise select first conversation if available and none is selected
+          if (formattedConversations.length > 0 && !selectedConversation) {
+            selectConversation(formattedConversations[0]);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    // Initial fetch
+    fetchConversations();
+    
+    // Set up periodic refresh (every 60 seconds)
+    const intervalId = setInterval(fetchConversations, 60000);
+    
+    // Clean up interval on unmount
+    return () => clearInterval(intervalId);
+  }, [selectedConversation, onlineUsers]);
+
+  // Scroll to bottom of messages only when messages change
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
+  
+  useEffect(() => {
+    if (messagesEndRef.current && shouldScrollToBottom) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, shouldScrollToBottom]);
+  
+  // Reset shouldScrollToBottom when conversation changes
+  useEffect(() => {
+    setShouldScrollToBottom(true);
+  }, [selectedConversation]);
+  
+  // Handle scroll events to disable auto-scrolling when user scrolls up
+  const handleMessagesScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    // If user has scrolled up more than 100px from bottom, disable auto-scroll
+    setShouldScrollToBottom(scrollHeight - scrollTop - clientHeight < 100);
+  };
+
+  // Update conversation when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0 && selectedConversation) {
+      const lastMessage = messages[messages.length - 1];
+      const conversationUserId = conversations.find(c => c.id === selectedConversation)?.userId;
+      
+      // Update the last message in the conversation list
+      if (conversationUserId && (lastMessage.senderId === conversationUserId || lastMessage.receiverId === conversationUserId)) {
+        setConversations(prev => {
+          return prev.map(conv => {
+            if (conv.userId === conversationUserId || conv.id === selectedConversation) {
+              return {
+                ...conv,
+                lastMessage: lastMessage.content,
+                timestamp: lastMessage.createdAt
+              };
+            }
+            return conv;
+          });
+        });
+      }
+    }
+  }, [messages, selectedConversation]);
+
+  // Update online status of users in conversations
+  useEffect(() => {
+    if (!onlineUsers) return;
+    
+    // Update online status for each conversation
+    setConversations(prevConversations => 
+      prevConversations.map(conv => ({
+        ...conv,
+        isOnline: onlineUsers.has(conv.userId)
+      }))
+    );
+  }, [onlineUsers]);
+
+  // Handle typing indicator from other users
+  useEffect(() => {
+    if (!selectedUserId || !typingUsers) return;
+    
+    // Check if the selected user is typing
+    const isUserTyping = typingUsers[selectedUserId];
+    console.log(`Typing status for user ${selectedUserId}: ${isUserTyping ? 'typing' : 'not typing'}`);
+    setIsTyping(!!isUserTyping);
+  }, [typingUsers, selectedUserId]);
+
+  // Function to select a conversation
+  const selectConversation = (conversation: Conversation) => {
+    console.log(`Selecting conversation with user: ${conversation.userId}`);
+    setSelectedConversation(conversation.id);
+    setSelectedUserId(conversation.userId);
+    
+    // Set active conversation in messaging context
+    setActiveConversation(conversation.userId);
+    
+    // Update URL with the user ID parameter without reloading the page
+    const url = new URL(window.location.href);
+    url.searchParams.set('userId', conversation.userId);
+    window.history.pushState({}, '', url);
+  };
+
+  // Handle sending a message
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
 
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      content: newMessage,
-      senderId: 'current-user',
-      timestamp: new Date().toISOString(),
+    const conversation = conversations.find(c => c.id === selectedConversation);
+    if (!conversation) return;
+
+    // Send message through the messaging context
+    sendMessage(newMessage, conversation.userId);
+    
+    // Update the conversation in the list with the new message
+    const updatedConversation = {
+      ...conversation,
+      lastMessage: newMessage,
+      timestamp: new Date().toISOString()
     };
-
-    setMessages((prev) => ({
-      ...prev,
-      [selectedConversation]: [...(prev[selectedConversation] || []), newMsg],
-    }));
-
-    // Update the last message in the conversation
-    setConversations((prev) => 
-      prev.map((conv) => 
-        conv.id === selectedConversation 
-          ? { ...conv, lastMessage: newMessage, timestamp: new Date().toISOString() } 
-          : conv
-      )
-    );
-
+    
+    // Move the updated conversation to the top of the list and update its content
+    setConversations(prev => {
+      const filteredConversations = prev.filter(conv => conv.id !== selectedConversation);
+      return [updatedConversation, ...filteredConversations];
+    });
+    
+    // Clear the input field
     setNewMessage('');
+    
+    // Cancel any typing notifications when sending the message
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  };
+
+  // Notify when typing
+  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewMessage(e.target.value);
+    
+    // If we have selected a conversation
+    if (selectedUserId) {
+      // Cancel previous timeout if exists
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      console.log(`Notifying typing to user: ${selectedUserId}`);
+      // Send typing notification through context
+      notifyTyping(selectedUserId);
+      
+      // Set timeout to clear typing status after 3 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        typingTimeoutRef.current = null;
+      }, 3000);
+    }
+  };
+
+  // Function to start a new conversation from search
+  const startNewConversation = async (user: User) => {
+    // Check if conversation already exists
+    const existingConversation = conversations.find(c => c.userId === user.id);
+    
+    if (existingConversation) {
+      // If exists, select it
+      selectConversation(existingConversation);
+    } else {
+      // Create a new conversation object
+      const newConversation: Conversation = {
+        id: `conv-${user.id}`, // Use a stable ID format
+        userId: user.id,
+        name: user.name,
+        avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`,
+        lastMessage: '',
+        timestamp: new Date().toISOString(),
+        isOnline: onlineUsers?.has(user.id) || false
+      };
+      
+      try {
+        // Send an initial empty message to create the conversation in backend
+        // This is optional but ensures the conversation shows up in the list later
+        const token = localStorage.getItem('token');
+        if (token && currentUser) {
+          // First select the conversation so it becomes active
+          setConversations(prev => [newConversation, ...prev]);
+          selectConversation(newConversation);
+          
+          // Then focus the message input
+          setTimeout(() => {
+            const messageInput = document.querySelector('input[placeholder="Type a message..."]') as HTMLInputElement;
+            if (messageInput) {
+              messageInput.focus();
+            }
+          }, 0);
+        }
+      } catch (error) {
+        console.error('Error starting new conversation:', error);
+      }
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -182,6 +378,17 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen bg-gray-100">
       <Navbar />
+      {/* Connection indicator */}
+      {connectionStatus === 'error' && (
+        <div className="bg-red-500 text-white text-center py-1">
+          Connection error. Messages may not be updated in real-time.
+        </div>
+      )}
+      {connectionStatus === 'reconnecting' && (
+        <div className="bg-yellow-500 text-white text-center py-1">
+          Reconnecting to chat server...
+        </div>
+      )}
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
           <div className="flex h-[calc(100vh-12rem)]">
@@ -190,49 +397,57 @@ export default function MessagesPage() {
               <div className="p-4 border-b border-gray-200 bg-blue-50">
                 <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
                 <div className="mt-2">
-                  <input
-                    type="text"
-                    placeholder="Search messages..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
+                  <UserSearch onSelectUser={startNewConversation} />
+                  <p className="text-xs text-gray-500 mt-1">Search for users to start a conversation</p>
                 </div>
               </div>
               <div className="divide-y divide-gray-200">
-                {conversations.map((conversation) => (
-                  <div
-                    key={conversation.id}
-                    className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors duration-150 ${
-                      selectedConversation === conversation.id ? 'bg-blue-50' : ''
-                    }`}
-                    onClick={() => setSelectedConversation(conversation.id)}
-                  >
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 relative">
-                        <img
-                          className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
-                          src={conversation.avatar}
-                          alt={conversation.name}
-                        />
-                        {conversation.lastMessage && (
-                          <span className="absolute top-0 right-0 block h-3 w-3 rounded-full bg-blue-600 ring-2 ring-white"></span>
-                        )}
-                      </div>
-                      <div className="ml-3 flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {conversation.name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {isToday(conversation.timestamp) 
-                              ? formatTime(conversation.timestamp) 
-                              : formatDate(conversation.timestamp)}
+                {conversations.length > 0 ? (
+                  conversations.map((conversation) => (
+                    <div
+                      key={conversation.id}
+                      className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors duration-150 ${
+                        selectedConversation === conversation.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                      }`}
+                      onClick={() => selectConversation(conversation)}
+                    >
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 relative">
+                          <img
+                            className="h-12 w-12 rounded-full object-cover border-2 border-gray-200"
+                            src={conversation.avatar}
+                            alt={conversation.name}
+                          />
+                          {conversation.isOnline && (
+                            <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-400 ring-2 ring-white"></span>
+                          )}
+                        </div>
+                        <div className="ml-3 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {conversation.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {conversation.timestamp ? 
+                                (isToday(conversation.timestamp) 
+                                  ? formatTime(conversation.timestamp) 
+                                  : formatDate(conversation.timestamp))
+                                : ''}
+                            </p>
+                          </div>
+                          <p className="text-sm text-gray-500 truncate">
+                            {conversation.lastMessage || 'Start a conversation...'}
                           </p>
                         </div>
-                        <p className="text-sm text-gray-500 truncate">{conversation.lastMessage}</p>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-gray-500">
+                    <p>No conversations yet</p>
+                    <p className="text-sm mt-1">Search for users to start messaging</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -243,103 +458,131 @@ export default function MessagesPage() {
                   {/* Conversation Header */}
                   <div className="p-4 border-b border-gray-200 bg-white shadow-sm">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 relative">
                         <img
                           className="h-10 w-10 rounded-full object-cover border-2 border-gray-200"
                           src={conversations.find((c) => c.id === selectedConversation)?.avatar || ''}
                           alt={conversations.find((c) => c.id === selectedConversation)?.name || ''}
                         />
+                        {conversations.find((c) => c.id === selectedConversation)?.isOnline && (
+                          <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-400 ring-2 ring-white"></span>
+                        )}
                       </div>
                       <div className="ml-3">
                         <p className="text-sm font-medium text-gray-900">
                           {conversations.find((c) => c.id === selectedConversation)?.name}
                         </p>
-                        <p className="text-xs text-gray-500">Active now</p>
-                      </div>
-                      <div className="ml-auto flex space-x-2">
-                        <button className="p-2 rounded-full hover:bg-gray-100">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                        </button>
-                        <button className="p-2 rounded-full hover:bg-gray-100">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        </button>
-                        <button className="p-2 rounded-full hover:bg-gray-100">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                          </svg>
-                        </button>
+                        <p className="text-xs text-gray-500">
+                          {isTyping ? (
+                            <span className="flex items-center text-green-600 font-semibold">
+                              <span>Typing</span>
+                              <span className="ml-1 flex">
+                                <span className="animate-bounce mx-0.5" style={{animationDelay: "0ms"}}>.</span>
+                                <span className="animate-bounce mx-0.5" style={{animationDelay: "300ms"}}>.</span>
+                                <span className="animate-bounce mx-0.5" style={{animationDelay: "600ms"}}>.</span>
+                              </span>
+                            </span>
+                          ) : (
+                            conversations.find((c) => c.id === selectedConversation)?.isOnline 
+                            ? 'Online' 
+                            : 'Offline'
+                          )}
+                        </p>
                       </div>
                     </div>
                   </div>
 
                   {/* Messages List */}
-                  <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-                    <div className="space-y-4">
-                      {messages[selectedConversation]?.map((message: Message) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${
-                            message.senderId === 'current-user' ? 'justify-end' : 'justify-start'
-                          }`}
-                        >
-                          {message.senderId !== 'current-user' && (
-                            <div className="flex-shrink-0 mr-2">
-                              <img
-                                className="h-8 w-8 rounded-full object-cover"
-                                src={conversations.find((c) => c.id === selectedConversation)?.avatar || ''}
-                                alt={conversations.find((c) => c.id === selectedConversation)?.name || ''}
-                              />
-                            </div>
-                          )}
+                  <div 
+                    className="flex-1 overflow-y-auto p-4 bg-gray-50"
+                    onScroll={handleMessagesScroll}
+                  >
+                    {loadingMessages ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                      </div>
+                    ) : filteredMessages.length > 0 ? (
+                      <div className="space-y-4">
+                        {filteredMessages.map((message) => (
                           <div
-                            className={`max-w-xs px-4 py-2 rounded-lg ${
-                              message.senderId === 'current-user'
-                                ? 'bg-blue-600 text-white rounded-br-none'
-                                : 'bg-white text-gray-900 rounded-bl-none shadow-sm'
+                            key={message.id}
+                            className={`flex ${
+                              message.senderId === currentUser?.id ? 'justify-end' : 'justify-start'
                             }`}
                           >
-                            <p className="text-sm">{message.content}</p>
-                            <p
-                              className={`text-xs mt-1 ${
-                                message.senderId === 'current-user'
-                                  ? 'text-blue-100'
-                                  : 'text-gray-500'
+                            {message.senderId !== currentUser?.id && message.sender && (
+                              <div className="flex-shrink-0 mr-2">
+                                <img
+                                  className="h-8 w-8 rounded-full object-cover"
+                                  src={message.sender.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(message.sender.name)}`}
+                                  alt={message.sender.name}
+                                />
+                              </div>
+                            )}
+                            <div
+                              className={`max-w-xs px-4 py-2 rounded-lg ${
+                                message.senderId === currentUser?.id
+                                  ? 'bg-blue-600 text-white rounded-br-none'
+                                  : 'bg-white text-gray-900 rounded-bl-none shadow-sm'
                               }`}
                             >
-                              {formatTime(message.timestamp)}
-                            </p>
+                              <p className="text-sm">{message.content}</p>
+                              <p
+                                className={`text-xs mt-1 flex items-center ${
+                                  message.senderId === currentUser?.id
+                                    ? 'text-blue-100'
+                                    : 'text-gray-500'
+                                }`}
+                              >
+                                {formatTime(message.createdAt)}
+                                {message.pending && (
+                                  <span className="ml-2">
+                                    <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  </span>
+                                )}
+                                {message.error && (
+                                  <span className="ml-2 text-red-300">
+                                    !
+                                  </span>
+                                )}
+                                {message.delivered && message.senderId === currentUser?.id && !message.read && (
+                                  <span className="ml-2">✓</span>
+                                )}
+                                {message.read && message.senderId === currentUser?.id && (
+                                  <span className="ml-2">✓✓</span>
+                                )}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No messages yet</p>
+                        <p className="text-sm mt-1">Start the conversation by sending a message</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Message Input */}
                   <div className="p-4 border-t border-gray-200 bg-white">
                     <form onSubmit={handleSendMessage}>
                       <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                          </svg>
-                        </button>
                         <input
                           type="text"
                           className="flex-1 rounded-full border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                           placeholder="Type a message..."
                           value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
+                          onChange={handleTyping}
                         />
                         <button
                           type="submit"
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          disabled={!newMessage.trim()}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Send
                         </button>
@@ -354,7 +597,7 @@ export default function MessagesPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                     <h3 className="mt-2 text-lg font-medium text-gray-900">No conversation selected</h3>
-                    <p className="mt-1 text-sm text-gray-500">Select a conversation to start messaging</p>
+                    <p className="mt-1 text-sm text-gray-500">Select a conversation or search for a user to start messaging</p>
                   </div>
                 </div>
               )}
