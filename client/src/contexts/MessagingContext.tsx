@@ -129,11 +129,33 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       
       // Always add message to state regardless of active conversation
       setMessages(prev => {
-        // Avoid duplicate messages
+        // Check for exact duplicates
         if (prev.some(m => m.id === message.id)) {
           console.log('Duplicate message skipped:', message.id);
           return prev;
         }
+        
+        // Check for pending message with matching content (optimistic update)
+        const isPendingDuplicate = prev.some(m => 
+          m.pending && 
+          m.content === message.content && 
+          m.senderId === message.senderId && 
+          m.receiverId === message.receiverId
+        );
+        
+        if (isPendingDuplicate) {
+          console.log('Pending duplicate message detected, updating instead of adding');
+          // Replace the pending message with the confirmed one
+          return prev.map(m => 
+            (m.pending && 
+             m.content === message.content && 
+             m.senderId === message.senderId && 
+             m.receiverId === message.receiverId)
+              ? { ...message, read: message.read || m.read } 
+              : m
+          );
+        }
+        
         console.log('Adding new message to state:', message.id);
         return [...prev, message];
       });
@@ -202,13 +224,22 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.log('SOCKET: Message sent confirmation:', data);
       // Replace temporary message with confirmed message
       if (data.tempId) {
-        setMessages(prev => 
-          prev.map(msg => 
+        setMessages(prev => {
+          // Check if we already have a message with the confirmed messageId
+          const hasConfirmedMessage = prev.some(msg => msg.id === data.messageId);
+          
+          if (hasConfirmedMessage) {
+            // If we already have the confirmed message, just remove the temporary one
+            return prev.filter(msg => msg.id !== data.tempId);
+          }
+          
+          // Otherwise replace temporary message with confirmed message
+          return prev.map(msg => 
             msg.id === data.tempId 
               ? { ...msg, id: data.messageId, pending: false, delivered: true } 
               : msg
-          )
-        );
+          );
+        });
       }
     });
     
@@ -217,13 +248,22 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.log('SOCKET: Message delivered confirmation:', data);
       // Replace temporary message with confirmed message if tempId is provided
       if (data.tempId) {
-        setMessages(prev => 
-          prev.map(msg => 
+        setMessages(prev => {
+          // Check if we already have a message with the confirmed messageId
+          const hasConfirmedMessage = prev.some(msg => msg.id === data.messageId);
+          
+          if (hasConfirmedMessage) {
+            // If we already have the confirmed message, just remove the temporary one
+            return prev.filter(msg => msg.id !== data.tempId);
+          }
+          
+          // Otherwise replace temporary message with confirmed message
+          return prev.map(msg => 
             msg.id === data.tempId 
               ? { ...msg, id: data.messageId, pending: false, delivered: true } 
               : msg
-          )
-        );
+          );
+        });
       } else {
         // Otherwise just mark the message as delivered
         setMessages(prev => 
