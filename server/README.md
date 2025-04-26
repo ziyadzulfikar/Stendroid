@@ -206,6 +206,27 @@ server/
 
 ## Environment Variables
 
+Required environment variables:
+
+```
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/linkedin_clone?schema=public"
+JWT_SECRET="your-secret-key"
+PORT=5001
+FRONTEND_URL="http://localhost:3000"
+```
+
+Optional environment variables:
+
+```
+# Additional allowed origins for CORS (comma-separated list)
+# Example: "https://app1.example.com,https://app2.example.com"
+CORS_ALLOWED_ORIGINS=""
+
+# Set NODE_ENV to "development" to allow all origins for CORS during development
+# Set to "production" in production environments
+NODE_ENV="development"
+```
+
 For security reasons, you should replace the placeholder JWT secret with a strong, random string:
 
 ```bash
@@ -220,6 +241,7 @@ openssl rand -hex 64
 - Never commit your `.env` file to version control
 - Use different JWT secrets for development and production
 - Consider rotating your JWT secret periodically
+- In production, make sure to set proper CORS origins to prevent unauthorized access
 
 ## Database Schema Overview
 

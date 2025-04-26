@@ -19,9 +19,32 @@ const users = new Map<string, string>(); // Maps userId to socketId
  * @returns {Server} The configured Socket.IO server instance
  */
 const initSocketServer = (server: HTTPServer) => {
+  // Get frontend URL from environment variable
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  
+  // Support multiple origins via comma-separated list in CORS_ALLOWED_ORIGINS
+  const additionalOrigins = process.env.CORS_ALLOWED_ORIGINS 
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : [];
+  
+  const allowedOrigins = [frontendUrl, ...additionalOrigins];
+
+  // Log allowed origins for debugging
+  logger.info(`Socket.IO CORS allowed origins: ${allowedOrigins.join(', ')}`);
+
   const io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:3000',
+      origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+          callback(null, true);
+        } else {
+          logger.warn(`Socket.IO CORS blocked connection from origin: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       methods: ['GET', 'POST'],
       credentials: true
     },

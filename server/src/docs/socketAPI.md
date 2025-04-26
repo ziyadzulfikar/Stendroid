@@ -12,6 +12,41 @@ const socket = io("http://localhost:5001", {
 });
 ```
 
+## CORS Configuration
+
+The Socket.IO server is configured to handle Cross-Origin Resource Sharing (CORS) for secure communication between client and server. This is especially important when your frontend and backend are hosted on different domains.
+
+### Environment Variables for CORS
+
+The server uses the following environment variables for CORS configuration:
+
+```
+# Main frontend URL (required)
+FRONTEND_URL="http://localhost:3000"
+
+# Additional allowed origins (optional, comma-separated list)
+CORS_ALLOWED_ORIGINS="https://app1.example.com,https://app2.example.com"
+
+# In development mode, all origins are allowed
+NODE_ENV="development"
+```
+
+When deploying to production, make sure to:
+1. Set `FRONTEND_URL` to your primary frontend domain
+2. Add any additional domains to `CORS_ALLOWED_ORIGINS`
+3. Set `NODE_ENV` to "production"
+
+### Client Setup for CORS
+
+When connecting from a different domain, make sure to enable CORS on the client side as well:
+
+```javascript
+const socket = io("https://your-api-server.com", {
+  query: { userId: "user-id-here" },
+  withCredentials: true
+});
+```
+
 ## Authentication
 
 After connecting, the client should authenticate to verify their identity:

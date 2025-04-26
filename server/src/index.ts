@@ -52,7 +52,32 @@ const setupDatabase = async () => {
 cleanupOldLogs();
 
 // Middleware
-app.use(cors());
+const corsOptions = {
+  origin: function(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    // Get frontend URL from environment variable
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    
+    // Support multiple origins via comma-separated list in CORS_ALLOWED_ORIGINS
+    const additionalOrigins = process.env.CORS_ALLOWED_ORIGINS 
+      ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim())
+      : [];
+    
+    const allowedOrigins = [frontendUrl, ...additionalOrigins];
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      logger.warn(`CORS blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(requestLogger);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
